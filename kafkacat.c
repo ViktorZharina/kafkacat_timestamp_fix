@@ -186,7 +186,8 @@ static void dr_msg_cb (rd_kafka_t *rk, const rd_kafka_message_t *rkmessage,
  */
 static void produce (void *buf, size_t len,
                      const void *key, size_t key_len, int msgflags,
-                     void *msg_opaque, rd_kafka_headers_t* headers) {
+                     void *msg_opaque, rd_kafka_headers_t* headers, int64_t timestamp) {
+
         rd_kafka_headers_t *hdrs = NULL;
 
         /* Headers are freed on successful producev(), pass a copy. */
@@ -206,6 +207,8 @@ static void produce (void *buf, size_t len,
 				}
 		}
 
+
+
         /* Produce message: keep trying until it succeeds. */
         do {
                 rd_kafka_resp_err_t err;
@@ -222,6 +225,7 @@ static void produce (void *buf, size_t len,
                         RD_KAFKA_V_VALUE(buf, len),
                         RD_KAFKA_V_KEY(key, key_len),
                         RD_KAFKA_V_HEADERS(hdrs),
+                        RD_KAFKA_V_TIMESTAMP(timestamp),
                         RD_KAFKA_V_OPAQUE(msg_opaque),
                         RD_KAFKA_V_END);
 
@@ -307,7 +311,7 @@ static ssize_t produce_file (const char *path) {
 
         KC_INFO(4, "Producing file %s (%"PRIdMAX" bytes)\n",
                 path, (intmax_t)st.st_size);
-        produce(ptr, sz, conf.fixed_key, conf.fixed_key_len, msgflags, NULL, NULL);
+        produce(ptr, sz, conf.fixed_key, conf.fixed_key_len, msgflags, NULL, NULL, 0);
 
         _COMPAT(close)(fd);
 
@@ -442,6 +446,7 @@ static void producer_run (FILE *fp, char **paths, int pathcnt) {
 
                 parse_json_message(b->buf, b->size + 2, &msg);
                 const unsigned char *buf = msg.payload;
+                const int64_t ts = msg.ts;
                 size_t len = msg.payload_len;
                 const unsigned char *key = msg.key;
                 size_t key_len = msg.key_len;
@@ -478,7 +483,7 @@ static void producer_run (FILE *fp, char **paths, int pathcnt) {
                 }
 
                 /* Produce message */
-                produce((char *)buf, len, key, key_len, msgflags, buffer, msg.headers);
+                produce((char *)buf, len, key, key_len, msgflags, buffer, msg.headers, ts);
                         
                 if (msg.headers) {
 					rd_kafka_headers_destroy(msg.headers);
@@ -585,7 +590,7 @@ static void producer_run (FILE *fp, char **paths, int pathcnt) {
                 /* Produce message */
                 produce(buf, len, key, key_len, msgflags,
                         (msgflags & RD_KAFKA_MSG_F_COPY) ?
-                        NULL : b, NULL);
+                        NULL : b, NULL, 0);
 
                 if (conf.flags & CONF_F_TEE &&
                     fwrite(b->buf, b->size, 1, stdout) != 1)

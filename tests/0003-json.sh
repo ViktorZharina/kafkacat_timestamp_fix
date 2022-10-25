@@ -31,4 +31,16 @@ if [[ $output != "$exp" ]]; then
     FAIL "Expected '$exp', not '$output'"
 fi
 
+topic=$(make_topic_name)
+
+echo -n '{"topic":"sorted","partition":0,"offset":0,"tstype":"create","ts":1613826868174,"broker":0,"key":"TheKey","payload":"payload1"}' | $KAFKACAT -P -t $topic -J
+
+output=$($KAFKACAT -C -J -t $topic -o beginning -e | jq '.ts')
+
+exp="1613826868174"
+
+if [[ $output != "$exp" ]]; then
+    FAIL "Expected '$exp', not '$output'"
+fi
+
 PASS
